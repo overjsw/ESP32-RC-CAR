@@ -69,6 +69,7 @@ class ServerCallback : public BLEServerCallbacks {
     Serial.println("Client Connected!");
     digitalWrite(GPIO_LED_FL, HIGH);
     digitalWrite(GPIO_LED_FR, HIGH);
+    //motor_stop(MCPWM_UNIT_0, MCPWM_TIMER_0);
   };
 
   void onDisconnect(BLEServer* pServer) {
@@ -76,6 +77,7 @@ class ServerCallback : public BLEServerCallbacks {
     pServer->startAdvertising();  // restart advertising
     digitalWrite(GPIO_LED_FL, LOW);
     digitalWrite(GPIO_LED_FR, LOW);
+    motor_stop(MCPWM_UNIT_0, MCPWM_TIMER_0);
   }
 };
 
