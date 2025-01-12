@@ -159,44 +159,83 @@ class _ControlScreenState extends State<ControlScreen> {
     context.pop(needToReConnect);
   }
 
+  // void writeBLE(int cmd, int data) async {
+  //   if (!isConnected) {
+  //     backToHome(true);
+  //     return;
+  //   }
+
+  //   if (cmd == CMD_DC && _isSendingDC) {
+  //     _isSendingDC = false;
+  //     await _characteristicTX?.write([cmd, data], timeout: 1);
+  //     _isSendingDC = true;
+  //   } else if (cmd == CMD_SERVO && _isSendingSERVO) {
+  //     _isSendingSERVO = false;
+  //     await _characteristicTX?.write([cmd, data], timeout: 1);
+  //     _isSendingSERVO = true;
+  //   }
+
+  //   if (cmd == CMD_DC) {
+  //     _preDC = data;
+  //   } else if (cmd == CMD_SERVO) {
+  //     _preServo = data;
+  //   }
+  // }
   void writeBLE(int cmd, int data) async {
+    //print('writeBLE called with cmd: $cmd, data: $data'); // 디버깅 출력
+
     if (!isConnected) {
+      print('Not connected, returning to home'); // 디버깅 출력
       backToHome(true);
       return;
     }
 
-    if (cmd == CMD_DC && _isSendingDC) {
-      _isSendingDC = false;
-      await _characteristicTX?.write([cmd, data], timeout: 1);
-      _isSendingDC = true;
-    } else if (cmd == CMD_SERVO && _isSendingSERVO) {
-      _isSendingSERVO = false;
-      await _characteristicTX?.write([cmd, data], timeout: 1);
-      _isSendingSERVO = true;
+    if (cmd == CMD_DC) { 
+      if(data == 127 || _isSendingDC) {
+        _isSendingDC = false;
+        await _characteristicTX?.write([cmd, data], timeout: 1);
+        //await _characteristicTX?.write([cmd, data], withoutResponse: true);
+        print('DC command sent: [cmd: $cmd, data: $data]'); // 디버깅 출력
+        _isSendingDC = true;
+        _preDC = data;
+      }
+    } else if (cmd == CMD_SERVO) { 
+      if(data == 127 || _isSendingSERVO) {
+        _isSendingSERVO = false;
+        await _characteristicTX?.write([cmd, data], timeout: 1);
+        //await _characteristicTX?.write([cmd, data], withoutResponse: true);
+        print('SERVO command sent: [cmd: $cmd, data: $data]'); // 디버깅 출력
+        _isSendingSERVO = true;
+        _preServo = data;
+      }
     }
 
-    if (cmd == CMD_DC) {
-      _preDC = data;
-    } else if (cmd == CMD_SERVO) {
-      _preServo = data;
-    }
+    // if (cmd == CMD_DC) {
+      
+    //   //print('Previous DC data updated: $_preDC'); // 디버깅 출력
+    // } else if (cmd == CMD_SERVO) {
+      
+    //   //print('Previous SERVO data updated: $_preServo'); // 디버깅 출력
+    // }
   }
 
   void prepareSendingData(int cmd, double data) {
     int remappingInt = 0;
-
+    //print("Sending data: $cmd, $data");
     if (cmd == CMD_DC) {
       double remapping = data.remap(-1.00, 1.00, 255, 0);
       remappingInt = remapping.toInt();
       updateSpeedometer(remappingInt);
 
-      if ((remappingInt - _preDC).abs() < DATA_GAP) {
+      if (data != 0 && ((remappingInt - _preDC).abs() < DATA_GAP)) {
+        //print("Returned");
         return;
       }
     } else if (cmd == CMD_SERVO) {
       double remapping = data.remap(-1.00, 1.00, 0, 255);
       remappingInt = remapping.toInt();
-      if ((remappingInt - _preServo).abs() < DATA_GAP) {
+      if (data != 0 && ((remappingInt - _preServo).abs() < DATA_GAP)) {
+        //print("Returned");
         return;
       }
     }
