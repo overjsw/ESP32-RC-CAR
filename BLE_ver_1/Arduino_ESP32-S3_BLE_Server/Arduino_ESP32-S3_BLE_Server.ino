@@ -18,7 +18,7 @@
 #include <BLEUtils.h>
 #include <BLE2902.h>
 
-#include <ESP32Servo.h>  //https://madhephaestus.github.io/ESP32Servo/annotated.html
+//#include <ESP32Servo.h>  //https://madhephaestus.github.io/ESP32Servo/annotated.html
 #include "driver/mcpwm.h"
 #include <Wire.h>
 
@@ -27,10 +27,17 @@
 #define CHARACTERISTIC_UUID_TX "94b43599-5ea2-41e7-9d99-6ff9b904ae3a"
 #define CHARACTERISTIC_UUID_RX "04d3552e-b9b3-4be6-a8b4-aa43c4507c4d"
 
-#define GPIO_PWM0A_OUT 1
-#define GPIO_PWM0B_OUT 2
+#define GPIO_PWM0A_OUT 2
+#define GPIO_PWM0B_OUT 0
+#define GPIO_PWM1A_OUT 4
+#define GPIO_PWM1B_OUT 16
 
-Servo servo_motor;
+#define GPIO_LED_FL 17
+#define GPIO_LED_FR 5
+#define GPIO_LED_RL 18
+#define GPIO_LED_RR 19
+
+//Servo servo_motor;
 
 BLEServer* pServer = NULL;
 BLECharacteristic* pCharacteristicTX = NULL;
@@ -60,11 +67,15 @@ static void motor_stop(mcpwm_unit_t mcpwm_num, mcpwm_timer_t timer_num) {
 class ServerCallback : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     Serial.println("Client Connected!");
+    digitalWrite(GPIO_LED_FL, HIGH);
+    digitalWrite(GPIO_LED_FR, HIGH);
   };
 
   void onDisconnect(BLEServer* pServer) {
     Serial.println("Client disconnecting... Waiting for new connection");
     pServer->startAdvertising();  // restart advertising
+    digitalWrite(GPIO_LED_FL, LOW);
+    digitalWrite(GPIO_LED_FR, LOW);
   }
 };
 
@@ -80,24 +91,35 @@ class RXCallback : public BLECharacteristicCallbacks {
 
     switch (data[0]) {
       case 1:
-        Serial.println("DC");
+        Serial.println("DC1");
         motorSpeed = data[1] - 127;
         Serial.printf("DC Speed: %d\n", motorSpeed);
         if (motorSpeed == 0) {
           motor_stop(MCPWM_UNIT_0, MCPWM_TIMER_0);
+          digitalWrite(GPIO_LED_RL, LOW);
+          digitalWrite(GPIO_LED_RR, LOW);
         } else if (motorSpeed > 0) {
           motor_forward(MCPWM_UNIT_0, MCPWM_TIMER_0, motorSpeed);
+          digitalWrite(GPIO_LED_RL, LOW);
+          digitalWrite(GPIO_LED_RR, LOW);  
         } else {
-          motor_backward(MCPWM_UNIT_0, MCPWM_TIMER_0, motorSpeed);
+          motor_backward(MCPWM_UNIT_0, MCPWM_TIMER_0, abs(motorSpeed));
+          digitalWrite(GPIO_LED_RL, HIGH);
+          digitalWrite(GPIO_LED_RR, HIGH);
         }
         break;
 
       case 2:
-        servoAngle = data[1];
-        if (servoAngle > 180) servoAngle = 180;
-
-        Serial.printf("Servo Angle: %d\n", servoAngle);
-        servo_motor.write(servoAngle);
+        Serial.println("DC2");
+        motorSpeed = data[1] - 127;
+        Serial.printf("DC Speed: %d\n", motorSpeed);
+        if (motorSpeed == 0) {
+          motor_stop(MCPWM_UNIT_1, MCPWM_TIMER_1);
+        } else if (motorSpeed > 0) {
+          motor_forward(MCPWM_UNIT_1, MCPWM_TIMER_1, motorSpeed);
+        } else {
+          motor_backward(MCPWM_UNIT_1, MCPWM_TIMER_1, abs(motorSpeed));
+        }
         break;
 
       default:
@@ -109,11 +131,13 @@ class RXCallback : public BLECharacteristicCallbacks {
 
 static void motor_init() {
   // Servo Motor
-  servo_motor.attach(3, 750, 2250);
+  //servo_motor.attach(3, 750, 2250);
 
   // DC Motor
   mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM0A, GPIO_PWM0A_OUT);
   mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM0B, GPIO_PWM0B_OUT);
+  mcpwm_gpio_init(MCPWM_UNIT_1, MCPWM1A, GPIO_PWM1A_OUT);
+  mcpwm_gpio_init(MCPWM_UNIT_1, MCPWM1B, GPIO_PWM1B_OUT);
 
   // MCPWM Config
   mcpwm_config_t pwm_config;
@@ -124,11 +148,21 @@ static void motor_init() {
   pwm_config.duty_mode = MCPWM_DUTY_MODE_0;
 
   mcpwm_init(MCPWM_UNIT_0, MCPWM_TIMER_0, &pwm_config);
+  mcpwm_init(MCPWM_UNIT_1, MCPWM_TIMER_1, &pwm_config);
 }
 
 void setup() {
   Serial.begin(115200);
+  pinMode(GPIO_LED_FL, OUTPUT);
+  pinMode(GPIO_LED_FR, OUTPUT);
+  pinMode(GPIO_LED_RL, OUTPUT);
+  pinMode(GPIO_LED_RR, OUTPUT);
 
+  digitalWrite(GPIO_LED_FL, LOW);
+  digitalWrite(GPIO_LED_FR, LOW);
+  digitalWrite(GPIO_LED_RL, LOW);
+  digitalWrite(GPIO_LED_RR, LOW);
+  
   // Motor Initialization
   motor_init();
 
